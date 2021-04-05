@@ -1,0 +1,9 @@
+This is a test file to see if I can add files in other languages.
+
+This is 中文。 
+
+This is русский.
+
+Now I can upload a simple text file into Github...
+
+Here is an example of a change I made... 你好！
