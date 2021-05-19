@@ -1,13 +1,29 @@
 <h1>{{type}} Request Received!</h1>
 
-<ul>
+<table>
 
+  <tr>
+    <th>PARAMETER</th>
+    <th>VALUE</th>
+  </tr>
+  
   {{#each urlList}}
-    <li>{{this.name}}: {{this.value}}
+  <tr>
+    <td>{{this.name}}: </td> <td>{{this.value}}</td>
+  </tr>
   {{/each}}
+</table>
+</br>
+
+<table>
+  <tr>
+    <th>BODY PARAM</th>
+    <th>BODY VALUE (empty table if nothing in body for POST)</th>
+  </tr>
 
   {{#each bodyList}}
-    <li>{{this.name}}: {{this.value}}
+  <tr>
+    <td>{{this.name}}:</td> <td> {{this.value}}</td>
+  </tr>
   {{/each}}
-
-</ul>
+</table>
