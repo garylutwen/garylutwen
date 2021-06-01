@@ -1,128 +1,109 @@
-// Gary Lutwen
-// Oregon State University
-// CS290	HW5
-// 18 May 2021
-
-
 var express = require('express');
+var mysql = require('./dbcon.js');
 
+var path = require('path');
 var app = express();
+var handlebars = require('express-handlebars').create({defaultLayout:'main'});
 
-var exphbs = require('express-handlebars');
-app.engine('handlebars', exphbs());
+app.engine('handlebars', handlebars.engine);
 app.set('view engine', 'handlebars');
+app.set('port', 1987);
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(express.urlencoded({extended: false}));
-app.use(express.json());
-
-app.set('port', 1969);
-
-
-
-// ADDED THIS FUNCTION TO BOILERPLATE CODE FROM G HEALEY VIDEO
-// SO I CAN AVOID SOME REDUNDANCY IN MY GET AND POST ROUTES
-
-const getQueryParameters = (req, res, next) => 
-	{
-  		res.locals.queryData = req.query;
-  		next();
-	};
-
-
-// NOW WE ACTUALLY GRAB ALL OF THE PARAMETERS FROM THE QUERY STRING
-// AND WE CAN USE THEM IN THE GET AND POST ROUTES
-
-app.use(getQueryParameters);
-
-
-
-// GET ROUTE TAKES THE PARAMETERS FROM THE QUERY STRING AND STORES THEM
-// IN A STACK DATA STRUCTURE VIA .PUSH, AND THEN WE RENDER THE DATA
-// USING THE masterHTML.handlebars FILE IN MY VIEWS FOLDER
-
-app.get('/', function(req, res){
-
-	
-	console.log(res.locals.queryData);
-	
-	var urlGetParameters = [];
-
-	for (var i in res.locals.queryData)
-	{
-		urlGetParameters.push({'name':i, 'value':res.locals.queryData[i]});
-	}	
-
-	var context = {};
-	context.urlList = urlGetParameters;
-	context.type = 'GET';
-	res.render('masterHTML', context);
-
-	
+app.get('/',function(req,res){
+    res.render('home');
 });
 
-
-
-// POST ROUTE TAKES THE PARAMETERS FROM THE QUERY STRING AND STORES THEM
-// IN A STACK DATA STRUCTURE VIA .PUSH, AND THEN WE RENDER THE DATA
-// USING THE masterHTML.handlebars FILE IN MY VIEWS FOLDER.  WE ALSO HAVE
-// THE OPTION OF TAKING PARAMETERS FROM THE BODY AS WELL.  THEY ARE
-// DIFFERENTIATED BY USING CONTEXT2.URLLIST AND CONTEXT2BODYLIST.
-// MY masterHTML.handlebars FILE ALLOWS FOR A POST REQUEST THAT HAS QUERY
-// PARAMETERS, BODY PARAMETERS, OR BOTH.
-
-
-app.post('/', function(req, res){
-	
-	console.log(res.locals.queryData);
-
-
-	var urlPostParameters = [];
-
-	for (var j in res.locals.queryData)
-	{
-		urlPostParameters.push({'name':j, 'value':res.locals.queryData[j]});
-	}
-	
-	var context2 = {};
-	context2.urlList = urlPostParameters;
-
-
-	var bodyParameters = [];
-
-	for (var k in req.body)
-	{
-		bodyParameters.push({'name':k, 'value':req.body[k]});
-	}
-
-	context2.bodyList = bodyParameters;
-
-
-	context2.type = 'POST';
-	res.render('masterHTML', context2);
-
+app.get('/all',function(req,res,next){
+    var context = {};
+    mysql.pool.query('SELECT * FROM workouts', function(err, rows, fields){
+        if(err){
+            console.log("ran into an error");
+            next(err);
+            return;
+        }
+        context.results = JSON.stringify(rows);
+        res.send(context);
+    });
 });
 
+app.get('/insert',function(req,res,next){
+    var context = {};
+    //console.log(req.query);
+    mysql.pool.query("INSERT INTO workouts (`name`, `reps`, `weight`, `date`, `lbs`) VALUES (?, ?, ?, ?, ?)", [req.query.name, req.query.reps, req.query.weight, req.query.date, req.query.lbs], function(err, result){
+        if(err){
+            next(err);
+            return;
+        }
+        context.results = "Inserted id " + result.insertId;
+        res.send(context);
+    });
+});
 
+app.get('/update',function(req,res,next){
+    var context = {};
+    mysql.pool.query("SELECT * FROM workouts WHERE id=?", [req.query.id], function(err, result){
+        if(err){
+            next(err);
+            return;
+        }
+        if(result.length == 1){
+            var curVals = result[0];
+            mysql.pool.query("UPDATE workouts SET name=?, reps=?, weight=?, date=?, lbs=? WHERE id=? ",
+            [req.query.name || curVals.name, req.query.reps || curVals.reps, req.query.weight || curVals.weight, req.query.date || curVals.date, req.query.lbs || curVals.lbs, req.query.id],
+            function(err, result){
+            if(err){
+                next(err);
+                return;
+            }
+            context.results = "Updated " + result.changedRows + " rows.";
+            res.render('home',context);
+            });
+        }
+    });
+});
 
-// THESE NEXT TWO ROUTES ARE THE BOILERPLATE CODE FOR THE ERROR ROUTES THAT WE
-// WERE PERMITTED TO COPY FROM THE LECTURE.
+app.get('/removeID',function(req,res,next){
+    var context = {};
+    //console.log(req.query);
+    mysql.pool.query("DELETE FROM workouts WHERE id=?", [req.query.id], function(err, result){
+        if(err){
+            next(err);
+            return;
+        }
+        context.results = "Results" + result.removeId;
+        res.send(context);
+    });
+});
+
+app.get('/reset-table',function(req,res,next){
+    var context = {};
+    mysql.pool.query("DROP TABLE IF EXISTS workouts", function(err){ //replace your connection pool with the your variable containing the connection pool
+        var createString = "CREATE TABLE workouts("+
+        "id INT PRIMARY KEY AUTO_INCREMENT,"+
+        "name VARCHAR(255) NOT NULL,"+
+        "reps INT,"+
+        "weight INT,"+
+        "date DATE,"+
+        "lbs BOOLEAN)";
+        mysql.pool.query(createString, function(err){
+            context.results = "Table reset";
+            res.render('home',context);
+        })
+    });
+});
 
 app.use(function(req,res){
-  res.type('text/plain');
   res.status(404);
-  res.send('404 - Not Found: ');
+  res.render('404');
 });
 
 app.use(function(err, req, res, next){
   console.error(err.stack);
-  res.type('plain/text');
   res.status(500);
-  res.send('500 - Server Error');
+  res.render('500');
 });
 
-
-// we need an event prevent default here...
-
 app.listen(app.get('port'), function(){
-  console.log('Express started for Gary Lutwen on http://localhost:' + app.get('port') + '; press Ctrl-C to terminate.');
+  console.log('Express started on http://localhost:' + app.get('port') + '; press Ctrl-C to terminate.');
 });
